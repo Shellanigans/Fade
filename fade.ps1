@@ -3,8 +3,6 @@
     # This would mean you have to kill it in taskmgr though
         # Maybe another hot-key to end it?
 
-# TODO Profile how much CPU usage changes when using different delays
-
 Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
@@ -36,6 +34,7 @@ public static class fade{
 $fadeValue = 128 # Ranges from 0 (invisible) to 255 (normal, opaque)
 $settings = @{}
 while($true){
+    [System.Threading.Thread]::Sleep(15)
     if([fade]::GetKeyState(0x13) -gt 1){
         $fg = [fade]::GetForegroundWindow()
         # Find window with focus
