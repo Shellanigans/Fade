@@ -1,3 +1,11 @@
+# TODO Make this into a runspace/thread so it doesn't need to consume an entire powershell window
+# TODO ALT Could also just add the ShowWindow function and set the window to hidden
+    # This would mean you have to kill it in taskmgr though
+        # Maybe another hot-key to end it?
+
+# TODO Add simple way to change the fade value
+# TODO Profile how much CPU usage changes when using different delays
+
 Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
@@ -33,7 +41,9 @@ while($true){
         $prevSettings = [fade]::GetWindowLongPtrA($fg,-20)
         # Get the extended window settings 
 
-        [void][fade]::SetWindowLongPtrA($fg, -20, ($prevSettings -bor 0x80000))
+        if($prevSettings -bxor 0x80000){
+            [void][fade]::SetWindowLongPtrA($fg, -20, ($prevSettings -bor 0x80000))
+        }
         # Pause/break pressed so at the BARE minimum we need to force the layered state to check alpha
 
         $colorKey = 0
@@ -63,7 +73,7 @@ while($true){
             $retVal = [fade]::GetLayeredWindowAttributes($fg, [ref]$colorKey, [ref]$alpha, [ref]$flags)
             # Last check on current alpha value
             if($retVal -and $alpha -eq 255){ # If alpha = 255, then we must be done with it, change the type back
-                [void][fade]::SetWindowLongPtrA($fg, -20, ($prevSettings -bxor 0x80000))
+                [void][fade]::SetWindowLongPtrA($fg, -20, $prevSettings)
             }
         }
     }
