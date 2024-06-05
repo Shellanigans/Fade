@@ -41,7 +41,7 @@ while($true){
         # Find window with focus
 
         $prevSettings = 0
-        if($settings.Keys.Contains($fg)){ # If previously seen window
+        if($settings.ContainsKey($fg)){ # If previously seen window
             $prevSettings = $settings.$fg
             # Recall saved settings
         }else{
