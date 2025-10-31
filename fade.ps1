@@ -1,8 +1,3 @@
-# TODO Make this into a runspace/thread so it doesn't need to consume an entire powershell window
-# TODO ALT Could also just add the ShowWindow function and set the window to hidden
-    # This would mean you have to kill it in taskmgr though
-        # Maybe another hot-key to end it?
-
 Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
@@ -34,83 +29,82 @@ public static class fade{
 $modified = $false
 $fade = 128 # Ranges from 0 (invisible) to 255 (normal, opaque)
 $fadeStep = 16
+$fadeMin = 16
+$fadeMax = 238
+
 $settings = @{}
 while($true){
     [System.Threading.Thread]::Sleep(15)
-    if([fade]::GetKeyState(0x13) -gt 1){
-        $fg = [fade]::GetForegroundWindow()
-        # Find window with focus
+    try{
+        if([fade]::GetKeyState(0x13) -gt 1){
+            $fg = [fade]::GetForegroundWindow()
+            # Find window with focus
 
-        $prevSettings = 0
-        if($settings.ContainsKey($fg)){ # If previously seen window
-            $prevSettings = $settings.$fg
-            # Recall saved settings
-        }else{
-            $prevSettings = [fade]::GetWindowLongPtrA($fg,-20)
-            # Get the extended window settings
-            $settings.$fg = $prevSettings
-            # Store them in the hashtable
-        }
-
-        if($prevSettings -band -bnot 0x80000){
-            [void][fade]::SetWindowLongPtrA($fg, -20, ($prevSettings -bor 0x80000))
-        }
-        # Pause/break pressed so at a minimum we need to force the layered style to check alpha
-
-        $colorKey = 0
-        $alpha = 255
-        $flags = 2
-        $retVal = [fade]::GetLayeredWindowAttributes($fg, [ref]$colorKey, [ref]$alpha, [ref]$flags)
-        # This is a pass by ref function so the variables need to exist first and their value gets updated
-
-        if($retVal){ # If call succeeded
-            if($alpha -eq 0){$alpha = 255} # The first succesful call has alpha 0. IDK
-
-            # Store value of current fade settings
-            $newAlpha = $fade
-
-            if($alpha -lt 255 -and !$modified){$newAlpha = 255}
-            # Decide if we are making opaque or not, ignore wrap around from modify
-
-            [void][fade]::SetLayeredWindowAttributes($fg, 0, $newAlpha, 2)
-            # Set the new value
-
-            if([fade]::GetKeyState(0x10) -gt 1){ # If holding shift
-                while([fade]::GetKeyState(0x13) -gt 1){[void]''}
-                # Wait until they let go of both shift and pause/break
+            if($settings.ContainsKey($fg)){ # If previously seen window
+                $prevSettings = $settings.$fg.windowSettings
+                # Recall saved settings
             }else{
-                while([fade]::GetKeyState(0x13) -gt 1){
-                    $modified = $false
-                    if([fade]::GetKeyState(0x26) -gt 1 -and $newAlpha -ne 255){ # Up arrow
-                        $fade+=$fadeStep; if($fade -gt 254){$fade = 254}
-                        while([fade]::GetKeyState(0x26) -gt 1){[void]''}
-                        #[System.Threading.Thread]::Sleep(50)
-                        $modified = $true
-                        break
-                    }elseif([fade]::GetKeyState(0x28) -gt 1 -and $newAlpha -ne 255){ # Down arrow
-                        $fade-=$fadeStep; if($fade -lt 1){$fade = 1}
-                        while([fade]::GetKeyState(0x28) -gt 1){[void]''}
-                        #[System.Threading.Thread]::Sleep(50)
-                        $modified = $true
-                        break
+                $prevSettings = [fade]::GetWindowLongPtrA($fg,-20)
+                # Get the extended window settings
+                $settings.$fg = @{
+                    isFaded = $false
+                    currAlpha = 128
+                    windowSettings = $prevSettings
+                }
+                # Store them in the hashtable
+            }
+
+            if($prevSettings -band -bnot 0x80000){
+                [void][fade]::SetWindowLongPtrA($fg, -20, ($prevSettings -bor 0x80000))
+            }
+            # Pause/break pressed so at a minimum we need to force the layered style to check alpha
+
+            $colorKey = 0
+            $alpha = 255
+            $flags = 2
+            $retVal = [fade]::GetLayeredWindowAttributes($fg, [ref]$colorKey, [ref]$alpha, [ref]$flags)
+            # This is a pass by ref function so the variables need to exist first and their value gets updated
+
+            if($retVal){ # If call succeeded
+                if($alpha -eq 0){$alpha = 255} # The first succesful call has alpha 0. IDK
+
+                $settings.$fg.isFaded = !$settings.$fg.isFaded
+                if($settings.$fg.isFaded){
+                    [void][fade]::SetLayeredWindowAttributes($fg, 0, $settings.$fg.currAlpha, 2)
+                }else{
+                    [void][fade]::SetLayeredWindowAttributes($fg, 0, 255, 2)
+                }
+
+                if([fade]::GetKeyState(0x10) -gt 1){ # If holding shift
+                    while([fade]::GetKeyState(0x13) -gt 1){[void]$null}
+                    # Wait until they let go of both shift and pause/break
+                    $settings.$fg.isFaded = !$settings.$fg.isFaded
+                }else{
+                    while([fade]::GetKeyState(0x13) -gt 1){
+                        if([fade]::GetKeyState(0x26) -gt 1 -and $settings.$fg.isFaded){ # Up arrow
+                            $settings.$fg.currAlpha+=$fadeStep
+                            if($settings.$fg.currAlpha -gt 239){$settings.$fg.currAlpha = 239}
+                            while([fade]::GetKeyState(0x26) -gt 1){[void]$null}
+                            # Wait until they let go of up arrow key
+                            if($settings.$fg.isFaded){[void][fade]::SetLayeredWindowAttributes($fg, 0, $settings.$fg.currAlpha, 2)}
+                        }elseif([fade]::GetKeyState(0x28) -gt 1 -and $settings.$fg.isFaded){ # Down arrow
+                            $settings.$fg.currAlpha-=$fadeStep
+                            if($settings.$fg.currAlpha -lt 16){$settings.$fg.currAlpha = 16}
+                            while([fade]::GetKeyState(0x28) -gt 1){[void]$null}
+                            # Wait until they let go of down arrow key
+                            if($settings.$fg.isFaded){[void][fade]::SetLayeredWindowAttributes($fg, 0, $settings.$fg.currAlpha, 2)}
+                        }
                     }
                 }
-                # Wait until they let go of pause/break
 
-                if($modified){
-                    $alpha = 255
-                    # If we are modified, then the only possible restore value is 255
-                    continue
+                $settings.$fg.isFaded = !$settings.$fg.isFaded
+                if($settings.$fg.isFaded){
+                    [void][fade]::SetLayeredWindowAttributes($fg, 0, $settings.$fg.currAlpha, 2)
+                }else{
+                    [void][fade]::SetLayeredWindowAttributes($fg, 0, 255, 2)
                 }
-                [void][fade]::SetLayeredWindowAttributes($fg, 0, $alpha, 2)
-                # Return the state to what it was
-            }
-
-            $retVal = [fade]::GetLayeredWindowAttributes($fg, [ref]$colorKey, [ref]$alpha, [ref]$flags)
-            # Last check on current alpha value
-            if($retVal -and $alpha -eq 255){ # If alpha = 255, then we must be done with it, change the style back
-                [void][fade]::SetWindowLongPtrA($fg, -20, $prevSettings)
             }
         }
-    }
+        # Wait until they let go of pause/break
+    }catch{}
 }
