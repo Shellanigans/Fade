@@ -19,10 +19,10 @@ public static class fade{
     public static extern int GetWindowLongPtrA(IntPtr hWnd, int nIndex);
 
     [DllImport("user32.dll")]
-    public static extern int GetAsyncKeyState(int vKey);
+    public static extern uint GetAsyncKeyState(int vKey);
 
     [DllImport("user32.dll")]
-    public static extern int GetKeyState(int vKey);
+    public static extern uint GetKeyState(int vKey);
 }
 "@
 
