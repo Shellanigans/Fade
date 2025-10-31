@@ -26,7 +26,6 @@ public static class fade{
 }
 "@
 
-$fade = 128 # Ranges from 0 (invisible) to 255 (normal, opaque)
 $fadeStep = 16
 $fadeMin = 16
 $fadeMax = 238
